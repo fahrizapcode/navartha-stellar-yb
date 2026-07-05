@@ -45,7 +45,7 @@ export async function fetchAllBrands(): Promise<Brand[]> {
 
   try {
     const contract = new StellarSdk.Contract(CONTRACT_ID);
-    const account = new StellarSdk.Account('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN', '0');
+    const account = new StellarSdk.Account(StellarSdk.Keypair.random().publicKey(), '0');
 
     const tx = new StellarSdk.TransactionBuilder(account, {
       fee: StellarSdk.BASE_FEE,

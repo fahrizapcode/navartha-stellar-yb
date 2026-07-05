@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { StellarWalletsKit, WalletNetwork, allowAllModules, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { StellarWalletsKit, Networks } from '@creit.tech/stellar-wallets-kit';
+import { FreighterModule, FREIGHTER_ID } from '@creit.tech/stellar-wallets-kit/modules/freighter';
 
 interface WalletContextType {
-  kit: StellarWalletsKit | null;
+  kit: any;
   publicKey: string | null;
   isConnected: boolean;
   isConnecting: boolean;
@@ -15,40 +16,35 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
-let walletKitInstance: StellarWalletsKit | null = null;
+let isInitialized = false;
 
-function getWalletKit(): StellarWalletsKit {
-  if (!walletKitInstance) {
-    walletKitInstance = new StellarWalletsKit({
-      network: WalletNetwork.TESTNET,
+function initWalletKit() {
+  if (!isInitialized) {
+    StellarWalletsKit.init({
+      network: Networks.TESTNET,
       selectedWalletId: FREIGHTER_ID,
-      modules: allowAllModules(),
+      modules: [new FreighterModule()],
     });
+    isInitialized = true;
   }
-  return walletKitInstance;
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [kit] = useState<StellarWalletsKit>(() => getWalletKit());
+
+  useEffect(() => {
+    initWalletKit();
+  }, []);
 
   const connect = useCallback(async () => {
     setError(null);
     setIsConnecting(true);
+    initWalletKit();
     try {
-      await kit.openModal({
-        onWalletSelected: async (option) => {
-          kit.setWallet(option.id);
-          try {
-            const { address } = await kit.getAddress();
-            setPublicKey(address);
-          } catch {
-            setError('Gagal mendapatkan alamat wallet.');
-          }
-        },
-      });
+      const { address } = await StellarWalletsKit.authModal();
+      setPublicKey(address);
     } catch (e: any) {
       if (e?.message?.includes('User declined')) {
         setError('Koneksi wallet ditolak oleh pengguna.');
@@ -60,16 +56,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [kit]);
+  }, []);
 
   const disconnect = useCallback(() => {
     setPublicKey(null);
     setError(null);
+    StellarWalletsKit.disconnect().catch(console.error);
   }, []);
 
   return (
     <WalletContext.Provider
-      value={{ kit, publicKey, isConnected: !!publicKey, isConnecting, error, connect, disconnect }}
+      value={{ kit: StellarWalletsKit, publicKey, isConnected: !!publicKey, isConnecting, error, connect, disconnect }}
     >
       {children}
     </WalletContext.Provider>
